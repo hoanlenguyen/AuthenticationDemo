@@ -1,14 +1,16 @@
-﻿using JWT;
+﻿using AuthenticationDemo.Models;
+using JWT;
 using JWT.Algorithms;
 using JWT.Serializers;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using AuthenticationDemo.Models;
+
 //dotnet add package JWT -v 3.0.0-beta4
 //dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore
 //dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer
@@ -21,15 +23,18 @@ namespace AuthenticationDemo.Controllers
         private readonly UserManager<IdentityUser> _userManager;
         private readonly SignInManager<IdentityUser> _signInManager;
         private readonly JWTSettings _options;
+        private readonly ILogger<AccountController> logger;
 
         public AccountController(
           UserManager<IdentityUser> userManager,
           SignInManager<IdentityUser> signInManager,
-          IOptions<JWTSettings> optionsAccessor)
+          IOptions<JWTSettings> optionsAccessor,
+          ILogger<AccountController> logger)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _options = optionsAccessor.Value;
+            this.logger = logger;
         }
 
         [HttpPost]
@@ -63,11 +68,12 @@ namespace AuthenticationDemo.Controllers
                 if (result.Succeeded)
                 {
                     var user = await _userManager.FindByEmailAsync(Credentials.Email);
+                    logger.LogInformation("User {0} has logged", user.UserName);
                     return new JsonResult(new Dictionary<string, object>
-              {
-                { "access_token", GetAccessToken(Credentials.Email) },
-                { "id_token", GetIdToken(user) }
-              });
+                    {
+                        { "access_token", GetAccessToken(Credentials.Email) },
+                        { "id_token", GetIdToken(user) }
+                    });
                 }
                 return new JsonResult("Unable to sign in") { StatusCode = 401 };
             }
@@ -79,6 +85,26 @@ namespace AuthenticationDemo.Controllers
         {
             await _signInManager.SignOutAsync();
             return Ok();
+        }
+
+        [HttpPut("AddRoleToUser")]
+        public async Task<IActionResult> AddRoleToUser(string userEmail, string roleName)
+        {
+
+            var user = await _userManager.FindByEmailAsync(userEmail);
+
+            await _userManager.AddToRoleAsync(user, roleName);
+            //var testUser = new IdentityUser("TestUser");
+            //await _userManager.CreateAsync(testUser);
+            //await _userManager.AddToRoleAsync(testUser, "Administrators");
+            return Ok();
+        }
+
+        [HttpGet("GetUser")]
+        public async Task<IActionResult> AddRoleToUser(string userEmail)
+        {
+            var user = await _userManager.FindByEmailAsync(userEmail);
+            return Ok(user);
         }
 
         private string GetIdToken(IdentityUser user)

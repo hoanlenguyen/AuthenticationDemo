@@ -1,4 +1,6 @@
 using AuthenticationDemo.Data;
+using AuthenticationDemo.Roles;
+using AuthenticationDemo.Roles.Permissions;
 using AuthenticationDemo.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
@@ -8,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -32,10 +35,14 @@ namespace AuthenticationDemo
             services.AddControllers();
 
             services.AddScoped<IAccountService, AccountService>();
+            services.AddScoped<IStudentService, StudentService>();
+            services.AddScoped<IManageRoleService, ManageRoleService>();
 
             //Install-Package Microsoft.AspNetCore.Identity.EntityFrameworkCore -Version 3.1.5
             services.AddIdentity<IdentityUser, IdentityRole>()
              .AddEntityFrameworkStores<DemoDbContext>();
+
+            services.AddHttpContextAccessor();
 
             services.Configure<JWTSettings>(Configuration.GetSection("JWTSettings"));
 
@@ -55,6 +62,20 @@ namespace AuthenticationDemo
                     ValidAudience = Configuration["JWTSettings:Audience"],
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(Configuration["JWTSettings:SecretKey"]))
                 };
+            });
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy(Permissions.Students.View, builder =>
+                {
+                    builder.AddRequirements(new PermissionRequirement(Permissions.Students.View));
+                });
+
+                options.AddPolicy(Permissions.Configurations.View, builder =>
+                {
+                    builder.AddRequirements(new PermissionRequirement(Permissions.Configurations.View));
+                });
+
             });
 
             services.AddSwaggerGen(c =>
@@ -84,8 +105,10 @@ namespace AuthenticationDemo
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
+            loggerFactory.AddFile("Logs/myapp-{Date}.txt");
+
             if (env.IsDevelopment())
             {
                 app.UseDeveloperExceptionPage();
